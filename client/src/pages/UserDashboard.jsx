@@ -6,13 +6,27 @@ import { toast } from 'react-toastify';
 function UserDashboard() {
     const [user, setUser] = useState(null);
     const [amount, setAmount] = useState('');
+    const [myDonations, setMyDonations] = useState([]); 
     const navigate = useNavigate();
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
         if (!storedUser) navigate('/login');
-        setUser(JSON.parse(storedUser));
+        else {
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
+            fetchHistory(parsedUser.id); 
+        }
     }, []);
+
+    const fetchHistory = async (userId) => {
+        try {
+            const { data } = await API.get(`/payment/my-donations/${userId}`);
+            setMyDonations(data);
+        } catch (err) {
+            console.error("Failed to fetch history");
+        }
+    };
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -22,20 +36,18 @@ function UserDashboard() {
 
     const handleDonation = async () => {
         if (!amount || amount <= 0) return toast.error("Enter a valid amount");
-
         try {
-            const { data } = await API.post('/payment/checkout', { 
-                amount: amount, 
-                userId: user.id 
-            });
-
+            const { data } = await API.post('/payment/checkout', { amount, userId: user.id });
+            
             const options = {
                 key: import.meta.env.VITE_RAZORPAY_KEY_ID,
                 amount: data.order.amount,
                 currency: "INR",
-                name: "NSS IIT Roorkee",
-                description: "Donation to Nation",
+                name: "NSS Donation",
                 order_id: data.order.id,
+                
+                retry: { enabled: false }, 
+
                 handler: async function (response) {
                     try {
                         const verifyRes = await API.post('/payment/verify', {
@@ -44,31 +56,29 @@ function UserDashboard() {
                             razorpay_signature: response.razorpay_signature,
                             donationId: data.donationId
                         });
-
                         if (verifyRes.data.status === 'success') {
-                            toast.success("Donation Successful! Thank you.");
+                            toast.success("Donation Successful!");
                             setAmount('');
-                        } else {
-                            toast.error("Verification failed");
+                            fetchHistory(user.id);
                         }
-                    } catch (err) {
-                        toast.error("Payment verification failed");
-                    }
-                },
-                prefill: {
-                    name: user.name,
-                    email: user.email,
+                    } catch (err) { toast.error("Verification failed"); }
                 },
                 theme: { color: "#3399cc" }
             };
 
             const rzp = new window.Razorpay(options);
-            rzp.open();
 
-        } catch (err) {
-            console.error(err);
-            toast.error("Donation initiation failed");
-        }
+            rzp.on('payment.failed', async function (response) {
+                await API.post('/payment/verify', {
+                    donationId: data.donationId,
+                    status: 'failed'
+                });
+                toast.error("Payment Failed");
+                fetchHistory(user.id); 
+            });
+
+            rzp.open();
+        } catch (err) { toast.error("Donation initiation failed"); }
     };
 
     if (!user) return <div>Loading...</div>;
@@ -76,25 +86,40 @@ function UserDashboard() {
     return (
         <div className="container" style={{ marginTop: '50px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <h2>Welcome, {user.name}</h2>
+                <h2>Hello, {user.name}</h2>
                 <button onClick={handleLogout} style={{ background: '#dc3545' }}>Logout</button>
             </div>
 
-            <div style={{ marginTop: '30px', padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
+            <div style={{ marginTop: '20px', padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
                 <h3>Make a Donation</h3>
-                <p>Support the cause explicitly managed by NSS.</p>
-                
-                <input 
-                    type="number" 
-                    placeholder="Enter Amount (INR)" 
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    style={{ maxWidth: '300px', display: 'block' }}
-                />
-                
-                <button onClick={handleDonation} style={{ marginTop: '10px' }}>
-                    Donate Now
-                </button>
+                <input type="number" placeholder="Amount (INR)" value={amount} onChange={(e) => setAmount(e.target.value)} style={{ maxWidth: '300px' }} />
+                <button onClick={handleDonation}>Donate</button>
+            </div>
+
+            <div style={{ marginTop: '30px' }}>
+                <h3>Your Donation History</h3>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+                    <thead>
+                        <tr style={{ background: '#eee', textAlign: 'left' }}>
+                            <th style={{ padding: '8px' }}>Amount</th>
+                            <th style={{ padding: '8px' }}>Status</th>
+                            <th style={{ padding: '8px' }}>Date</th>
+                            <th style={{ padding: '8px' }}>Payment ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {myDonations.map(d => (
+                            <tr key={d._id} style={{ borderBottom: '1px solid #ddd' }}>
+                                <td style={{ padding: '8px' }}>₹{d.amount}</td>
+                                <td style={{ padding: '8px', color: d.status === 'success' ? 'green' : 'red' }}>
+                                    {d.status.toUpperCase()}
+                                </td>
+                                <td style={{ padding: '8px' }}>{new Date(d.createdAt).toLocaleDateString()}</td>
+                                <td style={{ padding: '8px', fontSize: '12px', color: '#666' }}>{d.paymentId || '-'}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );

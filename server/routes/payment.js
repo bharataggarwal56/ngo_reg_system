@@ -39,6 +39,10 @@ router.post('/checkout', async (req, res) => {
 
 router.post('/verify', async (req, res) => {
     try {
+        if (req.body.status === 'failed') {
+            await Donation.findByIdAndUpdate(req.body.donationId, { status: 'failed' });
+            return res.json({ status: 'failed' });
+        }
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature, donationId } = req.body;
 
         const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -49,15 +53,12 @@ router.post('/verify', async (req, res) => {
             .digest('hex');
 
         if (expectedSignature === razorpay_signature) {
-            
             await Donation.findByIdAndUpdate(donationId, { 
                 status: 'success', 
                 paymentId: razorpay_payment_id 
             });
-
             res.json({ status: 'success' });
         } else {
-            
             await Donation.findByIdAndUpdate(donationId, { status: 'failed' });
             res.status(400).json({ status: 'failed' });
         }
@@ -67,4 +68,12 @@ router.post('/verify', async (req, res) => {
     }
 });
 
+router.get('/my-donations/:userId', async (req, res) => {
+    try {
+        const donations = await Donation.find({ userId: req.params.userId }).sort({ createdAt: -1 });
+        res.json(donations);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 module.exports = router;
