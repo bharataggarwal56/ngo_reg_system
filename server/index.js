@@ -6,7 +6,7 @@ const authRoutes = require('./routes/auth');
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+// const PORT = process.env.PORT || 5000;
 const adminRoutes = require('./routes/admin');
 
 app.use(cors());
@@ -25,6 +25,16 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/admin', adminRoutes);
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+// app.listen(PORT, () => {
+//     console.log(`Server running on port ${PORT}`);
+// });
+const PORT = process.env.PORT || 5000;
+
+
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
+
+module.exports = app;
