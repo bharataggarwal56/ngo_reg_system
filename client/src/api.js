@@ -4,7 +4,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-    baseURL: '/api',  
+    baseURL: 'https://ngo-reg-system.onrender.com/api', 
 });
 
 API.interceptors.request.use((req) => {
