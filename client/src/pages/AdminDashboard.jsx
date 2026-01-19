@@ -1,134 +1,142 @@
 import { useState, useEffect } from 'react';
 import API from '../api';
 import { useNavigate } from 'react-router-dom';
+import Navbar from '../Navbar';
 
 function AdminDashboard() {
     const [stats, setStats] = useState({ totalUsers: 0, totalDonations: 0 });
-    const [users, setUsers] = useState([]);
-    const [donations, setDonations] = useState([]);
+    const [data, setData] = useState({ users: [], donations: [] });
     const [view, setView] = useState('users'); 
-    const [searchTerm, setSearchTerm] = useState('');
+    const [search, setSearch] = useState('');
+    const [user, setUser] = useState(null);
     const navigate = useNavigate();
 
     useEffect(() => {
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (!user || user.role !== 'admin') {
-            navigate('/login');
-            return;
-        }
-        fetchData();
+        const storedUser = JSON.parse(localStorage.getItem('user'));
+        if (storedUser?.role !== 'admin') return navigate('/login');
+        setUser(storedUser);
+        
+        Promise.all([
+            API.get('/admin/stats'),
+            API.get('/admin/users'),
+            API.get('/admin/donations')
+        ]).then(([s, u, d]) => {
+            setStats(s.data);
+            setData({ users: u.data, donations: d.data });
+        }).catch(console.error);
     }, []);
 
-    const fetchData = async () => {
-        try {
-            const statsRes = await API.get('/admin/stats');
-            setStats(statsRes.data);
-
-            const usersRes = await API.get('/admin/users');
-            setUsers(usersRes.data);
-
-            const donationsRes = await API.get('/admin/donations');
-            setDonations(donationsRes.data);
-        } catch (err) {
-            console.error("Admin fetch error", err);
-        }
-    };
-
     const handleExport = () => {
-        const csvContent = "data:text/csv;charset=utf-8," 
-            + "Name,Email,Phone,Joined\n"
-            + users.map(u => `${u.name},${u.email},${u.phone},${u.createdAt}`).join("\n");
-        
-        const encodedUri = encodeURI(csvContent);
+        const csv = "Name,Email,Phone,Joined\n" + data.users.map(u => `${u.name},${u.email},${u.phone},${u.createdAt}`).join("\n");
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "users_data.csv");
-        document.body.appendChild(link);
+        link.href = encodeURI("data:text/csv;charset=utf-8," + csv);
+        link.download = "users.csv";
         link.click();
     };
 
+    const filteredUsers = data.users.filter(u => u.name.toLowerCase().includes(search.toLowerCase()));
+
     return (
-        <div className="container" style={{ marginTop: '30px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <h2>Admin Dashboard</h2>
-                <button onClick={() => {
-                    localStorage.clear();
-                    navigate('/login');
-                }} style={{ background: '#dc3545' }}>Logout</button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
-                <div style={{ padding: '20px', background: '#e3f2fd', borderRadius: '8px', flex: 1 }}>
-                    <h3>Total Users</h3>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold' }}>{stats.totalUsers}</p>
-                </div>
-                <div style={{ padding: '20px', background: '#e8f5e9', borderRadius: '8px', flex: 1 }}>
-                    <h3>Total Donations</h3>
-                    <p style={{ fontSize: '24px', fontWeight: 'bold' }}>₹ {stats.totalDonations}</p>
-                </div>
-            </div>
-
-            <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                    <button onClick={() => setView('users')} style={{ marginRight: '10px', background: view === 'users' ? '#0056b3' : '#007bff' }}>Users</button>
-                    <button onClick={() => setView('donations')} style={{ background: view === 'donations' ? '#0056b3' : '#007bff' }}>Donations</button>
-                </div>
-                
-                {view === 'users' && (
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <input 
-                            type="text" 
-                            placeholder="Search by Name..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            style={{ width: '200px', margin: 0 }}
-                        />
-                        <button onClick={handleExport} style={{ background: '#28a745' }}>Export CSV</button>
+        <>
+            <Navbar user={user} />
+            <div className="container">
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
+                    <div className="card" style={{ flex: 1, textAlign: 'center' }}>
+                        <h3 style={{ color: '#64748b', fontSize: '0.9rem', textTransform: 'uppercase' }}>Total Users</h3>
+                        <p style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#1e40af', margin: 0 }}>{stats.totalUsers}</p>
                     </div>
-                )}
-            </div>
+                    <div className="card" style={{ flex: 1, textAlign: 'center' }}>
+                        <h3 style={{ color: '#64748b', fontSize: '0.9rem', textTransform: 'uppercase' }}>Funds Raised</h3>
+                        <p style={{ fontSize: '2.5rem', fontWeight: 'bold', color: '#10b981', margin: 0 }}>₹ {stats.totalDonations}</p>
+                    </div>
+                </div>
 
-            <table style={{ width: '100%', borderCollapse: 'collapse', background: 'white' }}>
-                <thead>
-                    <tr style={{ background: '#f8f9fa', textAlign: 'left' }}>
-                        {view === 'users' ? (
-                            <>
-                                <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Name</th>
-                                <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Email</th>
-                                <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Phone</th>
-                            </>
-                        ) : (
-                            <>
-                                <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Donor</th>
-                                <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Amount</th>
-                                <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Status</th>
-                                <th style={{ padding: '10px', borderBottom: '2px solid #ddd' }}>Date</th>
-                            </>
+                <div className="card">
+
+                    <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center', 
+                        flexWrap: 'wrap', 
+                        gap: '15px',
+                        marginBottom: '25px',
+                        borderBottom: '1px solid #f1f5f9',
+                        paddingBottom: '20px'
+                    }}>
+
+                        <div style={{ display: 'flex', gap: '10px', background: '#f8fafc', padding: '5px', borderRadius: '10px' }}>
+                            <button 
+                                onClick={() => setView('users')} 
+                                className={view === 'users' ? 'btn-primary' : 'btn-secondary'}
+                                style={{ width: 'auto', padding: '8px 20px', fontSize: '0.9rem' }}
+                            >
+                                Users
+                            </button>
+                            <button 
+                                onClick={() => setView('donations')} 
+                                className={view === 'donations' ? 'btn-primary' : 'btn-secondary'}
+                                style={{ width: 'auto', padding: '8px 20px', fontSize: '0.9rem' }}
+                            >
+                                Donations
+                            </button>
+                        </div>
+
+                        {view === 'users' && (
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <input 
+                                    placeholder="Search by name..." 
+                                    value={search} 
+                                    onChange={e => setSearch(e.target.value)} 
+                                    style={{ margin: 0, width: '250px', padding: '10px' }} 
+                                />
+                                <button onClick={handleExport} className="btn-success" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <span>⬇</span> Export CSV
+                                </button>
+                            </div>
                         )}
-                    </tr>
-                </thead>
-                <tbody>
-                    {view === 'users' ? users
-                        .filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map(u => (
-                        <tr key={u._id} style={{ borderBottom: '1px solid #eee' }}>
-                            <td style={{ padding: '10px' }}>{u.name}</td>
-                            <td style={{ padding: '10px' }}>{u.email}</td>
-                            <td style={{ padding: '10px' }}>{u.phone}</td>
-                        </tr>
-                    )) : donations.map(d => (
-                        <tr key={d._id} style={{ borderBottom: '1px solid #eee' }}>
-                            <td style={{ padding: '10px' }}>{d.userId?.name || 'Unknown'}</td>
-                            <td style={{ padding: '10px' }}>₹ {d.amount}</td>
-                            <td style={{ padding: '10px', color: d.status === 'success' ? 'green' : 'red' }}>
-                                {d.status.toUpperCase()}
-                            </td>
-                            <td style={{ padding: '10px' }}>{new Date(d.createdAt).toLocaleDateString()}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
+                    </div>
+
+                    <div style={{ overflowX: 'auto' }}>
+                        <table>
+                            <thead>
+                                <tr>
+                                    {view === 'users' ? 
+                                        ['Name', 'Email', 'Phone', 'Joined'].map(h => <th key={h}>{h}</th>) : 
+                                        ['Donor', 'Amount', 'Status', 'Date', 'Ref ID'].map(h => <th key={h}>{h}</th>)
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(view === 'users' ? filteredUsers : data.donations).map(row => (
+                                    <tr key={row._id}>
+                                        {view === 'users' ? (
+                                            <>
+                                                <td style={{ fontWeight: '600' }}>{row.name}</td>
+                                                <td>{row.email}</td>
+                                                <td style={{ color: '#64748b' }}>{row.phone || '-'}</td>
+                                                <td>{new Date(row.createdAt).toLocaleDateString()}</td>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <td>{row.userId?.name || 'Unknown'}</td>
+                                                <td style={{ fontWeight: 'bold' }}>₹ {row.amount}</td>
+                                                <td>
+                                                    <span className={`badge badge-${row.status}`}>
+                                                        {row.status.toUpperCase()}
+                                                    </span>
+                                                </td>
+                                                <td>{new Date(row.createdAt).toLocaleDateString()}</td>
+                                                <td style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{row.paymentId || 'N/A'}</td>
+                                            </>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </>
     );
 }
 

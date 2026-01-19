@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 
 function Register() {
     const [formData, setFormData] = useState({
-        name: '', email: '', password: '', phone: '', role: 'user'
+        name: '', email: '', password: '', phone: '', role: 'user', adminKey: ''
     });
     const navigate = useNavigate();
 
@@ -21,45 +21,36 @@ function Register() {
     };
 
     return (
-        <div className="container" style={{ marginTop: '50px', maxWidth: '400px' }}>
-            <h2>Register</h2>
-            <form onSubmit={handleSubmit}>
-                <input 
-                    type="text" placeholder="Name" required 
-                    onChange={(e) => setFormData({...formData, name: e.target.value})} 
-                />
-                <input 
-                    type="email" placeholder="Email" required 
-                    onChange={(e) => setFormData({...formData, email: e.target.value})} 
-                />
-                <input 
-                    type="password" placeholder="Password" required 
-                    onChange={(e) => setFormData({...formData, password: e.target.value})} 
-                />
-                <input 
-                    type="text" placeholder="Phone" 
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})} 
-                />
+        <div className="auth-wrapper">
+            <div className="auth-card">
+                <h2 style={{ fontSize: '2rem', color: '#1e40af', marginBottom: '5px' }}>Join NSS</h2>
+                <p style={{ color: '#64748b', marginBottom: '25px' }}>Create your volunteer account</p>
                 
-                <div style={{ margin: '10px 0' }}>
-                    <label>Role: </label>
-                    <select 
-                        value={formData.role} 
-                        onChange={(e) => setFormData({...formData, role: e.target.value})}
-                        style={{ padding: '5px' }}
-                    >
-                        <option value="user">User</option>
-                        <option value="admin">Admin</option>
+                <form onSubmit={handleSubmit}>
+                    <input type="text" placeholder="Full Name" required onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                    <input type="email" placeholder="Email Address" required onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                    <input type="password" placeholder="Password" required onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                    <input type="text" placeholder="Phone (Optional)" onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                    
+                    <select value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
+                        <option value="user">Donor / Student</option>
+                        <option value="admin">Administrator</option>
                     </select>
-                </div>
 
-                <button type="submit" style={{ width: '100%' }}>Register</button>
-            </form>
-            <p style={{ marginTop: '10px' }}>
-                Already have an account? <Link to="/login">Login</Link>
-            </p>
+                    {formData.role === 'admin' && (
+                        <input type="password" placeholder="Admin Secret Key" required
+                               style={{ borderColor: '#ef4444', background: '#fef2f2' }}
+                               onChange={(e) => setFormData({...formData, adminKey: e.target.value})} />
+                    )}
+
+                    <button type="submit" className="btn-primary">Create Account</button>
+                </form>
+                
+                <p style={{ marginTop: '20px', fontSize: '0.9rem', color: '#64748b' }}>
+                    Already registered? <Link to="/login" style={{ color: '#2563eb', fontWeight: 'bold' }}>Login</Link>
+                </p>
+            </div>
         </div>
     );
 }
-
 export default Register;

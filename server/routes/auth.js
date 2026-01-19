@@ -7,7 +7,11 @@ const router = express.Router();
 
 router.post('/register', async (req, res) => {
     try {
-        const { name, email, password, phone, role } = req.body;
+        const { name, email, password, phone, role, adminKey } = req.body; 
+
+        if (role === 'admin' && adminKey !== "NGO_ADMIN") {
+            return res.status(403).json({ message: "Invalid Admin Secret Key" });
+        }
 
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ message: "User already exists" });
@@ -16,11 +20,7 @@ router.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         const newUser = new User({
-            name,
-            email,
-            password: hashedPassword,
-            phone,
-            role: role || 'user'
+            name, email, password: hashedPassword, phone, role
         });
 
         await newUser.save();
@@ -49,6 +49,7 @@ router.post('/login', async (req, res) => {
                 id: user._id,
                 name: user.name,
                 email: user.email,
+                phone: user.phone,
                 role: user.role
             }
         });
